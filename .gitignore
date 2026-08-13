@@ -1,0 +1,18 @@
+# Dependency directories (never commit node_modules)
+web_app/node_modules/
+web_app/npm-debug.log*
+
+# Python caches and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# IDE / Operating System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

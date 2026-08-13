@@ -1,0 +1,37 @@
+{
+  "output_csv": "job_leads.csv",
+  "retention_months": 4,
+  "keywords": [
+    "automation",
+    "saas",
+    "build me",
+    "web dev",
+    "web development",
+    "app dev",
+    "app development",
+    "mobile app",
+    "ios",
+    "android",
+    "mvp",
+    "scraper",
+    "scraping",
+    "script",
+    "developer",
+    "engineer",
+    "programmer",
+    "software",
+    "python",
+    "django",
+    "react",
+    "node",
+    "javascript"
+  ],
+  "sources": {
+    "we_work_remotely": true,
+    "remotive": true,
+    "reddit": true,
+    "hacker_news": true,
+    "python_org": true,
+    "freelancer": true
+  }
+}
