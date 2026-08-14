@@ -410,9 +410,64 @@ app.get('/api/download', (req, res) => {
     }
 });
 
+const { exec } = require('child_process');
+
+function runScraperOnServer() {
+    console.log("Installing python scraper dependencies on server...");
+    exec('pip install feedparser || pip3 install feedparser', (err, stdout, stderr) => {
+        if (err) console.warn("Dependency install warning:", err.message);
+        
+        console.log("Launching python scraper sync on server...");
+        exec('python3 ../scraper.py || python ../scraper.py', (err, stdout, stderr) => {
+            if (err) {
+                console.error("Scraper run failed:", err.message);
+            } else {
+                console.log("Scraper output:\n", stdout);
+            }
+        });
+    });
+}
+
 app.listen(PORT, () => {
     console.log(`====================================================`);
     console.log(`Job Leads Web Application running on: http://localhost:${PORT}`);
     console.log(`Serving CSV Data from: ${CSV_PATH}`);
     console.log(`====================================================`);
+    
+    // Automatically trigger a scraper run on startup to populate initial data
+    runScraperOnServer();
+    
+    // Schedule scraper to run exactly at 11:00 AM Indian Standard Time (05:30 AM UTC) daily
+    scheduleDailyScraper();
 });
+
+function scheduleDailyScraper() {
+    const now = new Date();
+    // 11:00 AM IST is 05:30 AM UTC
+    const targetUTC = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        5, 30, 0, 0 // 05:30:00 UTC
+    ));
+    
+    // If target time has already passed today, set it for tomorrow
+    if (now.getTime() > targetUTC.getTime()) {
+        targetUTC.setUTCDate(targetUTC.getUTCDate() + 1);
+    }
+    
+    const msUntilTarget = targetUTC.getTime() - now.getTime();
+    const hours = (msUntilTarget / (1000 * 60 * 60)).toFixed(2);
+    console.log(`Scraper scheduled to run daily at 11:00 AM IST. Next sync in ${hours} hours.`);
+    
+    setTimeout(() => {
+        console.log("Executing scheduled 11:00 AM IST scraper run...");
+        runScraperOnServer();
+        
+        // Repeat every 24 hours thereafter
+        setInterval(() => {
+            console.log("Executing scheduled daily 11:00 AM IST scraper run...");
+            runScraperOnServer();
+        }, 24 * 60 * 60 * 1000);
+    }, msUntilTarget);
+}
