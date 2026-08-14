@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClientFlow | Premium Live Job Postings Database</title>
+    <meta name="description" content="Instant access to daily scraped job leads from Hacker News, Reddit, We Work Remotely, and Remotive. Direct recruiter emails and poster links included.">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-gradient-radial"></div>
+
+    <nav>
+        <div class="logo">
+            <span>⚡</span> ClientFlow
+        </div>
+        <div class="logo-badge">Live Automation</div>
+    </nav>
+
+    <div class="container">
+        <!-- Hero Header -->
+        <header class="hero">
+            <div class="live-indicator">
+                <span class="live-pulse"></span>
+                Database updated daily at 11:00 AM
+            </div>
+            <h1>Premium Job Leads<br>Without the <mark>Bidding Fees</mark></h1>
+            <p>Skip paying connects on Upwork or bidding tokens on Freelancer. Get direct poster links and application portals for active remote developer and business roles.</p>
+            <div class="hero-actions">
+                <a href="#pricing" class="btn btn-primary">Get Access Now</a>
+                <a href="#dashboard" class="btn btn-secondary">View Live Metrics</a>
+            </div>
+        </header>
+
+        <!-- Live Statistics Dashboard -->
+        <section id="dashboard" class="statistics">
+            <h2 class="section-title">Live Database Metrics</h2>
+            <div class="dashboard-grid">
+                <!-- Total Leads Card -->
+                <div class="stat-card">
+                    <div class="stat-label">Total Active Leads</div>
+                    <div class="stat-value" id="stat-total-jobs">-</div>
+                    <div class="stat-subtext">Verified postings within last 4 months</div>
+                    <div class="stat-card-glow"></div>
+                </div>
+
+                <!-- Last Synced Card -->
+                <div class="stat-card">
+                    <div class="stat-label">Last Automated Sync</div>
+                    <div class="stat-value" id="stat-last-sync" style="font-size: 1.5rem; padding: 0.5rem 0;">Loading...</div>
+                    <div class="stat-subtext">Automatic daily background updates</div>
+                </div>
+
+                <!-- Leads Access Cost Card -->
+                <div class="stat-card">
+                    <div class="stat-label">Leads Access Cost</div>
+                    <div class="platform-list" style="margin-top: 1rem;">
+                        <div class="platform-row">
+                            <span class="platform-name">Free to Contact</span>
+                            <span class="platform-count" id="stat-free-jobs">-</span>
+                        </div>
+                        <div class="platform-row">
+                            <span class="platform-name">Connects / Bids Required</span>
+                            <span class="platform-count" id="stat-paid-jobs">-</span>
+                        </div>
+                    </div>
+                    <div class="stat-subtext" style="margin-top: 1rem;">Bidding vs. public/direct sources</div>
+                </div>
+
+                <!-- Sources Breakdown Card -->
+                <div class="stat-card">
+                    <div class="stat-label">Subreddit & Platform Feed</div>
+                    <div class="platform-list" id="platform-breakdown">
+                        <div style="color: var(--text-muted)">Loading active feeds...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Unlocked Download Panel (Hidden by default, shown after payment) -->
+        <section id="download-portal" class="download-panel">
+            <div class="success-badge">✓ Payment Authorized</div>
+            <h2>Download Your Job Leads</h2>
+            <p>You have unlocked direct, unrestricted download access. Choose your format below:</p>
+            
+            <div class="download-options">
+                <!-- CSV Card -->
+                <div class="download-card">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <h3>job_leads.csv</h3>
+                    <span>Spreadsheet format (Excel / Sheets)</span>
+                    <button class="btn btn-primary" id="btn-download-csv">Download CSV</button>
+                </div>
+
+                <!-- Pretty Text Card -->
+                <div class="download-card">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <h3>job_leads_table.txt</h3>
+                    <span>Space-aligned plain text table</span>
+                    <button class="btn btn-secondary" id="btn-download-txt">Download Text Table</button>
+                </div>
+            </div>
+            
+            <!-- Feedback / Customer Support Section -->
+            <div class="feedback-section" style="margin-top: 3.5rem; border-top: 1px solid var(--border-subtle); padding-top: 2rem;">
+                <p style="font-size: 0.95rem; color: var(--text-secondary);">
+                    Have ideas, custom requests, or feature suggestions? <br>
+                    <strong>Please let us know how we can improve!</strong> Reach us directly at 
+                    <a href="mailto:support@clientflow.com" style="color: var(--accent-teal); text-decoration: none; font-weight: 500;">support@clientflow.com</a>
+                </p>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section id="pricing" class="pricing-section">
+            <h2 class="section-title">Unlock Direct Recruiter Leads</h2>
+            
+            <div class="pricing-grid">
+                <!-- Plan 1: Single Export -->
+                <div class="pricing-card">
+                    <div class="plan-name">Single Export Pass</div>
+                    <div class="plan-price">$5<span>one-time</span></div>
+                    <ul class="plan-features">
+                        <li>Instant CSV & Text downloads</li>
+                        <li>Direct links to hiring posters</li>
+                        <li>Includes We Work Remotely & HN</li>
+                        <li>Includes 22 targeted subreddits</li>
+                        <li>4 months of compiled history</li>
+                    </ul>
+                    <button class="btn btn-secondary btn-select-plan" data-plan="single" data-price="5">Get 24h Export</button>
+                </div>
+
+                <!-- Plan 2: Pro Subscription -->
+                <div class="pricing-card popular">
+                    <div class="popular-badge">Best Value</div>
+                    <div class="plan-name">Pro Subscription</div>
+                    <div class="plan-price">$12<span>/ month</span></div>
+                    <ul class="plan-features">
+                        <li>**Unlimited** daily downloads</li>
+                        <li>Live dashboard updates</li>
+                        <li>Pre-sorted Reddit leads first</li>
+                        <li>Direct email/contact links</li>
+                        <li>Cancel or pause anytime</li>
+                        <li>No bidding or connect fees</li>
+                    </ul>
+                    <button class="btn btn-primary btn-select-plan" data-plan="monthly" data-price="12">Get Monthly Access</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="checkout-overlay"></div>
+
+    <!-- Slide-in Checkout Drawer -->
+    <aside class="checkout-drawer" id="checkout-drawer">
+        <div class="checkout-header">
+            <div class="checkout-title">Secure Checkout</div>
+            <button class="close-btn" id="btn-close-checkout">&times;</button>
+        </div>
+
+        <!-- Error Container -->
+        <div class="error-message" id="checkout-error"></div>
+
+        <!-- Order Summary -->
+        <div class="summary-card">
+            <div class="summary-row">
+                <span id="summary-plan-name">Plan Name</span>
+                <span id="summary-plan-price">$0.00</span>
+            </div>
+            <div class="summary-row total">
+                <span>Total Due</span>
+                <span id="summary-total-price">$0.00</span>
+            </div>
+        </div>
+
+        <!-- Stripe Mock Form -->
+        <form id="checkout-form">
+            <div class="form-group">
+                <label class="form-label" for="card-name">Cardholder Name</label>
+                <input class="form-input" type="text" id="card-name" placeholder="John Doe" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="card-number">Card Number</label>
+                <div class="input-wrapper">
+                    <input class="form-input" type="text" id="card-number" placeholder="4242 4242 4242 4242" required maxlength="19">
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div class="form-group">
+                    <label class="form-label" for="card-expiry">Expiration Date</label>
+                    <input class="form-input" type="text" id="card-expiry" placeholder="MM / YY" required maxlength="7">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="card-cvc">CVC</label>
+                    <input class="form-input" type="text" id="card-cvc" placeholder="123" required maxlength="4">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-checkout-submit" id="btn-submit-payment">
+                <span class="spinner" id="payment-spinner"></span>
+                <span id="btn-text">Pay Securely</span>
+            </button>
+        </form>
+
+        <!-- Stripe Trust Badge -->
+        <div class="stripe-footer">
+            <svg viewBox="0 0 40 18" xmlns="http://www.w3.org/2000/svg">
+                <path d="M39.6 8.5c0-3.3-1.8-4.9-4.8-4.9-3 0-5.1 1.7-5.1 4.9 0 3.7 2.4 4.8 5.4 4.8 1.4 0 2.8-.2 3.8-.7V11c-.9.4-2.1.6-3.3.6-2 0-3.2-.6-3.2-2.5h8c.1-.2.2-.4.2-.6zm-7.2-1.3c0-1.2.8-1.9 2-1.9s2 .7 2 1.9h-4zM24.7 3.9c-.8 0-1.7.4-2.2 1v-.8h-2.6V13h2.8v-5c0-1.4 1-2.1 2.3-2.1.3 0 .5 0 .8.1V3.9h-1.1zm-8.8.8v8.4h2.8V4.7h-2.8zm0-2.8v2h2.8v-2h-2.8zM10.8 1.9L8 13.1H5.3L3.6 5.8 1.8 13.1H0L3.1.9h2.8l1.6 6.8L9.2 1.9h1.6zm13.1-1.3l.3 1.2c-.7.1-1 .3-1 1v1.1h1v2.1h-1v5.7h-2.8V6.1h-.7V4.1h.7V3.5c0-1.8 1.1-2.9 2.8-2.9.2 0 .6 0 1 .1z"/>
+            </svg>
+            <span>Secured Stripe Gateway</span>
+        </div>
+    </aside>
+
+    <script src="app.js"></script>
+</body>
+</html>
