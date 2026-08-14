@@ -93,6 +93,32 @@ def matches_keywords(text, keywords):
     text_lower = text.lower()
     return any(kw.lower() in text_lower for kw in keywords)
 
+def is_for_hire_post(title):
+    title_lower = title.lower()
+    
+    # Exclude posts matching explicit "for hire" bracket structures
+    for_hire_markers = [
+        '[for hire]', '[for-hire]', '[forhire]', 
+        '(for hire)', '(for-hire)', '(forhire)',
+        'for hire:', 'for hire |'
+    ]
+    if any(marker in title_lower for marker in for_hire_markers):
+        return True
+        
+    # Also exclude standard "looking for work" phrases
+    freelancer_phrases = [
+        'hire me', 'looking for work', 'looking for a job', 
+        'available for hire', 'freelancer looking for', 'portfolio:'
+    ]
+    if any(phrase in title_lower for phrase in freelancer_phrases):
+        return True
+        
+    # Check if the title starts with "for hire" or "for-hire"
+    if title_lower.startswith('for hire') or title_lower.startswith('for-hire') or title_lower.startswith('forhire'):
+        return True
+        
+    return False
+
 # Make requests with custom user agents to avoid bot blocks
 def fetch_url(url, json_response=False, custom_headers=None):
     headers = {
@@ -248,6 +274,8 @@ def scrape_reddit_rss(subreddit, keywords):
             feed = feedparser.parse(xml_data)
             for entry in feed.entries:
                 title = entry.title
+                if is_for_hire_post(title):
+                    continue
                 link = entry.link
                 author = entry.author if hasattr(entry, 'author') else 'Reddit User'
                 desc = entry.content[0].value if hasattr(entry, 'content') and entry.content else ""
@@ -283,6 +311,8 @@ def scrape_reddit_rss(subreddit, keywords):
                 author_node = entry.find('atom:author/atom:name', ns)
                 
                 title = title_node.text if title_node is not None else ""
+                if is_for_hire_post(title):
+                    continue
                 link = link_node.attrib.get('href', '') if link_node is not None else ""
                 author = author_node.text if author_node is not None else "Reddit User"
                 content_html = content_node.text if content_node is not None else ""
@@ -411,10 +441,58 @@ def scrape_python_org(keywords):
     print(f"-> Found {len(jobs)} matching jobs from Python.org.")
     return jobs
 
+def scrape_remote_co(keywords):
+    jobs = []
+    print("Scraping Remote.co Job Board...")
+    url = "https://remote.co/remote-jobs/developer/feed/"
+    xml_data = fetch_url(url)
+    if not xml_data:
+        return jobs
+        
+    if feedparser:
+        feed = feedparser.parse(xml_data)
+        for entry in feed.entries:
+            title = entry.title
+            desc = entry.summary if hasattr(entry, 'summary') else ""
+            desc_text = strip_html(desc)
+            
+            if matches_keywords(title + " " + desc_text, keywords):
+                pub_date = datetime.utcnow()
+                if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                    import calendar
+                    pub_date = datetime.utcfromtimestamp(calendar.timegm(entry.published_parsed))
+                    
+                jobs.append({
+                    'id': entry.link,
+                    'title': title,
+                    'company_poster': "Remote.co",
+                    'source': 'Remote.co',
+                    'job_link': entry.link,
+                    'user_link': entry.link,
+                    'date_posted': pub_date
+                })
+    else:
+        entries = parse_rss_fallback(xml_data)
+        for entry in entries:
+            title = entry['title']
+            desc_text = strip_html(entry['description'])
+            if matches_keywords(title + " " + desc_text, keywords):
+                jobs.append({
+                    'id': entry['link'],
+                    'title': title,
+                    'company_poster': "Remote.co",
+                    'source': 'Remote.co',
+                    'job_link': entry['link'],
+                    'user_link': entry['link'],
+                    'date_posted': entry['published_datetime']
+                })
+    print(f"-> Found {len(jobs)} matching jobs from Remote.co.")
+    return jobs
+
 def scrape_freelancer(keywords):
     jobs = []
-    print("Scraping Freelancer.com active projects...")
-    url = "https://www.freelancer.com/api/projects/0.1/projects/active?limit=80"
+    print("Scraping Freelancer.com active projects (Unfiltered)...")
+    url = "https://www.freelancer.com/api/projects/0.1/projects/active?limit=150"
     data = fetch_url(url, json_response=True)
     if not data or data.get('status') != 'success' or 'result' not in data:
         return jobs
@@ -422,31 +500,29 @@ def scrape_freelancer(keywords):
     projects = data['result'].get('projects', [])
     for p in projects:
         title = p.get('title', '')
-        desc_text = strip_html(p.get('description', ''))
+        # Unfiltered - gets content writing, data entry, translation, tech, and everything!
+        submit_timestamp = p.get('submitdate')
+        try:
+            pub_date = datetime.fromtimestamp(submit_timestamp) if submit_timestamp else datetime.utcnow()
+        except Exception:
+            pub_date = datetime.utcnow()
+            
+        seo_url = p.get('seo_url', '')
+        owner_id = p.get('owner_id', '')
         
-        if matches_keywords(title + " " + desc_text, keywords):
-            submit_timestamp = p.get('submitdate')
-            try:
-                pub_date = datetime.fromtimestamp(submit_timestamp) if submit_timestamp else datetime.utcnow()
-            except Exception:
-                pub_date = datetime.utcnow()
-                
-            seo_url = p.get('seo_url', '')
-            owner_id = p.get('owner_id', '')
-            
-            job_link = f"https://www.freelancer.com/projects/{seo_url}" if seo_url else "https://www.freelancer.com"
-            user_link = f"https://www.freelancer.com/u/{owner_id}" if owner_id else job_link
-            
-            jobs.append({
-                'id': job_link,
-                'title': title,
-                'company_poster': f"Client {owner_id}" if owner_id else "Freelancer Client",
-                'source': 'Freelancer.com',
-                'job_link': job_link,
-                'user_link': user_link,
-                'date_posted': pub_date
-            })
-    print(f"-> Found {len(jobs)} matching jobs from Freelancer.com.")
+        job_link = f"https://www.freelancer.com/projects/{seo_url}" if seo_url else "https://www.freelancer.com"
+        user_link = f"https://www.freelancer.com/u/{owner_id}" if owner_id else job_link
+        
+        jobs.append({
+            'id': job_link,
+            'title': title,
+            'company_poster': f"Client {owner_id}" if owner_id else "Freelancer Client",
+            'source': 'Freelancer.com',
+            'job_link': job_link,
+            'user_link': user_link,
+            'date_posted': pub_date
+        })
+    print(f"-> Found {len(jobs)} jobs from Freelancer.com.")
     return jobs
 
 # Main execution loop
@@ -497,6 +573,10 @@ def main():
                     date_str = row.get('Date Posted (UTC)')
                     source = row.get('Source', '')
                     if job_id and date_str:
+                        title = row.get('Title', '')
+                        if is_for_hire_post(title):
+                            continue
+                            
                         # Migrate old plain URL IDs to "Source - URL" format
                         if source and not job_id.startswith(f"{source} - "):
                             job_id = f"{source} - {job_id}"
@@ -564,6 +644,12 @@ def main():
             new_jobs.extend(scrape_python_org(keywords))
         except Exception as e:
             print(f"Error scraping Python.org: {e}")
+            
+    if enabled_sources.get("remote_co", True):
+        try:
+            new_jobs.extend(scrape_remote_co(keywords))
+        except Exception as e:
+            print(f"Error scraping Remote.co: {e}")
             
 
     if enabled_sources.get("freelancer", True):
@@ -708,8 +794,31 @@ def main():
         print(f"Existing Updated: {updated_count}")
         print(f"Active Retention limit: {retention_months} months ({retention_days} days)")
         print("=" * 60)
+        
+        # Trigger daily email updates to subscribers
+        try:
+            trigger_daily_emails()
+        except Exception as e:
+            print(f"Error triggering daily email dispatch: {e}")
+            
     except Exception as e:
         print(f"Critical error writing outputs: {e}")
+
+def trigger_daily_emails():
+    print("Triggering daily CSV email dispatch to subscribers...")
+    secret = os.environ.get('SYNC_SECRET', 'clientflow_sync_secret')
+    server_url = os.environ.get('SERVER_URL', 'http://localhost:3000')
+    
+    url = f"{server_url}/api/send-daily-emails?secret={secret}"
+    req = urllib.request.Request(url, method='POST')
+    req.add_header('Content-Type', 'application/json')
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            import json
+            res_data = json.loads(response.read().decode('utf-8'))
+            print(f"-> Email trigger response: {res_data.get('message', 'No message')}")
+    except Exception as e:
+        print(f"Failed to trigger daily emails: {e}")
 
 if __name__ == '__main__':
     main()
