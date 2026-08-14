@@ -2,6 +2,10 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
+// Initialize Stripe Key (falls back to mock database mode if blank)
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+const stripe = stripeKey ? require('stripe')(stripeKey) : null;
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -148,8 +152,8 @@ app.get('/api/stats', (req, res) => {
 
 // 2. Mock payment checkout session
 // Simulates secure credit card charge processing
-app.post('/api/checkout', (req, res) => {
-    const { plan, cardNumber, expiry, cvc, name } = req.body;
+app.post('/api/checkout', async (req, res) => {
+    const { plan, price, cardNumber, expiry, cvc, name } = req.body;
 
     if (!plan || !cardNumber || !expiry || !cvc || !name) {
         return res.status(400).json({ success: false, error: "Missing required fields." });
@@ -161,12 +165,53 @@ app.post('/api/checkout', (req, res) => {
         return res.status(400).json({ success: false, error: "Invalid Card Number." });
     }
 
-    // Process Mock Charge
-    console.log(`Mocking Stripe charge for plan '${plan}' ($${plan === 'single' ? '5.00' : '12.00'})`);
+    // Determine final price (fallback to standard defaults if not passed)
+    const finalPrice = price || (plan === 'single' ? 5 : 12);
+
+    // If real Stripe SDK is configured via environment variables
+    if (stripe) {
+        console.log(`Processing actual Stripe charge for plan '${plan}' ($${finalPrice}.00)`);
+        try {
+            // Split expiry to month and year (Format: MM / YY)
+            const parts = expiry.split('/');
+            const expMonth = parseInt(parts[0].trim());
+            const expYear = parseInt(parts[1].trim()) + 2000; // YY -> 20YY
+
+            // Create charge using Stripe API
+            const charge = await stripe.charges.create({
+                amount: Math.round(finalPrice * 100), // in cents
+                currency: 'usd',
+                description: `ClientFlow ${plan} Access Pass`,
+                source: {
+                    object: 'card',
+                    number: cleanCard,
+                    exp_month: expMonth,
+                    exp_year: expYear,
+                    cvc: cvc,
+                    name: name
+                }
+            });
+
+            // Generate secure access token on successful charge
+            const token = 'stripe_live_tok_' + charge.id + '_' + Date.now();
+
+            return res.json({
+                success: true,
+                message: "Payment processed successfully via Stripe live checkout.",
+                token: token
+            });
+        } catch (err) {
+            console.error("Stripe Charge Error:", err.message);
+            return res.status(400).json({ success: false, error: err.message });
+        }
+    }
+
+    // Process Mock Charge Fallback
+    console.log(`Mocking Stripe charge for plan '${plan}' ($${finalPrice}.00)`);
     console.log(`Cardholder Name: ${name}`);
 
-    // Generate secure-looking token
-    const token = 'tok_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+    // Generate secure-looking mock token
+    const token = 'tok_mock_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
 
     res.json({
         success: true,
