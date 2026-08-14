@@ -6,6 +6,82 @@ const path = require('path');
 const stripeKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeKey ? require('stripe')(stripeKey) : null;
 
+const nodemailer = require('nodemailer');
+const SUBSCRIBERS_PATH = path.join(__dirname, 'subscribers.json');
+
+// Initialize nodemailer SMTP Transporter
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    auth: {
+        user: process.env.SMTP_USER, // Your email address
+        pass: process.env.SMTP_PASS  // Your email App Password
+    }
+});
+
+function addSubscriber(email) {
+    let subscribers = [];
+    try {
+        if (fs.existsSync(SUBSCRIBERS_PATH)) {
+            const data = fs.readFileSync(SUBSCRIBERS_PATH, 'utf8');
+            subscribers = JSON.parse(data);
+        }
+    } catch (e) {
+        console.error("Error reading subscribers file:", e);
+    }
+    
+    // Add if not already subscribed
+    if (!subscribers.includes(email)) {
+        subscribers.push(email);
+        try {
+            fs.writeFileSync(SUBSCRIBERS_PATH, JSON.stringify(subscribers, null, 2), 'utf8');
+            console.log(`Saved new subscriber: ${email}`);
+        } catch (e) {
+            console.error("Error writing subscribers file:", e);
+        }
+    }
+}
+
+async function sendInstantEmail(email) {
+    console.log(`Preparing to send instant CSV email to ${email}...`);
+    
+    if (!fs.existsSync(CSV_PATH)) {
+        console.error("job_leads.csv not found for instant sending.");
+        return;
+    }
+
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        try {
+            const mailOptions = {
+                from: `"ClientFlow Updates" <${process.env.SMTP_USER}>`,
+                to: email,
+                subject: `Your ClientFlow Job Leads Export Pass`,
+                text: `Hello,\n\nThank you for your purchase! Attached is your copy of the active job leads CSV from ClientFlow.\n\nBest regards,\nThe ClientFlow Team`,
+                attachments: [
+                    {
+                        filename: 'job_leads.csv',
+                        path: CSV_PATH
+                    }
+                ]
+            };
+
+            await transporter.sendMail(mailOptions);
+            console.log(`Instant CSV email sent successfully to ${email} via SMTP.`);
+        } catch (err) {
+            console.error(`Failed to send instant email to ${email}:`, err);
+        }
+    } else {
+        // Mock Instant Email log
+        console.log("================ MOCK INSTANT EMAIL ================");
+        console.log(`From: "ClientFlow Updates" <updates@clientflow.com>`);
+        console.log(`To: ${email}`);
+        console.log(`Subject: Your ClientFlow Job Leads Export Pass`);
+        console.log(`Attachment: Attached job_leads.csv (${fs.statSync(CSV_PATH).size} bytes)`);
+        console.log("====================================================");
+    }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -121,18 +197,24 @@ app.get('/api/stats', (req, res) => {
     } catch (e) {}
 
     // Slice first 5 jobs for the gated preview table
-    const previewJobs = jobs.slice(0, 5).map(job => ({
-        Title: job['Title'] || '',
-        Source: job['Source'] || '',
-        Date: job['Days Posted'] || 'Today',
-        Cost: job['Access Cost'] || (job['Source'].includes('Freelancer') ? 'Paid (Connects / Bids)' : 'Free (No Fees)')
-    }));
+    const previewJobs = jobs.slice(0, 5).map(job => {
+        let src = job['Source'] || '';
+        if (src.startsWith('Reddit')) {
+            src = 'Reddit';
+        }
+        return {
+            Title: job['Title'] || '',
+            Source: src,
+            Date: job['Days Posted'] || 'Today',
+            Cost: job['Access Cost'] || (job['Source'].includes('Freelancer') ? 'Paid (Connects / Bids)' : 'Free (No Fees)')
+        };
+    });
 
     // Find newest job title
     const newestLead = jobs[0] ? {
         title: jobs[0]['Title'],
         company: jobs[0]['Company / Poster'],
-        source: jobs[0]['Source'],
+        source: jobs[0]['Source'].startsWith('Reddit') ? 'Reddit' : jobs[0]['Source'],
         link: jobs[0]['Job Link']
     } : null;
 
@@ -153,7 +235,7 @@ app.get('/api/stats', (req, res) => {
 // 2. Mock payment checkout session
 // Simulates secure credit card charge processing
 app.post('/api/checkout', async (req, res) => {
-    const { plan, price, cardNumber, expiry, cvc, name } = req.body;
+    const { plan, price, email, cardNumber, expiry, cvc, name } = req.body;
 
     if (!plan || !cardNumber || !expiry || !cvc || !name) {
         return res.status(400).json({ success: false, error: "Missing required fields." });
@@ -195,6 +277,13 @@ app.post('/api/checkout', async (req, res) => {
             // Generate secure access token on successful charge
             const token = 'stripe_live_tok_' + charge.id + '_' + Date.now();
 
+            if (email) {
+                if (plan === 'subscription') {
+                    addSubscriber(email);
+                }
+                sendInstantEmail(email).catch(err => console.error("Error sending instant email:", err));
+            }
+
             return res.json({
                 success: true,
                 message: "Payment processed successfully via Stripe live checkout.",
@@ -213,10 +302,85 @@ app.post('/api/checkout', async (req, res) => {
     // Generate secure-looking mock token
     const token = 'tok_mock_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
 
+    if (email) {
+        if (plan === 'subscription') {
+            addSubscriber(email);
+        }
+        sendInstantEmail(email).catch(err => console.error("Error sending instant email:", err));
+    }
+
     res.json({
         success: true,
         message: "Payment authorized successfully via Stripe Mock Gateway.",
         token: token
+    });
+});
+
+// 2b. Dispatch daily CSV files automatically to subscribers
+app.post('/api/send-daily-emails', async (req, res) => {
+    const secretKey = req.headers['x-sync-secret'] || req.query.secret;
+    const expectedSecret = process.env.SYNC_SECRET || 'clientflow_sync_secret';
+    
+    if (secretKey !== expectedSecret) {
+        return res.status(401).json({ success: false, error: "Unauthorized sync trigger." });
+    }
+
+    let subscribers = [];
+    try {
+        if (fs.existsSync(SUBSCRIBERS_PATH)) {
+            subscribers = JSON.parse(fs.readFileSync(SUBSCRIBERS_PATH, 'utf8'));
+        }
+    } catch (e) {
+        return res.status(500).json({ success: false, error: "Failed to read subscriber list." });
+    }
+
+    if (subscribers.length === 0) {
+        console.log("No active daily subscribers to update.");
+        return res.json({ success: true, message: "No active subscribers." });
+    }
+
+    console.log(`Preparing to send daily CSV update to ${subscribers.length} subscribers...`);
+
+    if (!fs.existsSync(CSV_PATH)) {
+        return res.status(404).json({ success: false, error: "job_leads.csv not found on server." });
+    }
+
+    // If SMTP email settings are provided in Render config
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        try {
+            const mailOptions = {
+                from: `"ClientFlow Updates" <${process.env.SMTP_USER}>`,
+                to: subscribers.join(', '),
+                subject: `Daily Job Leads CSV Update - ClientFlow`,
+                text: `Hello Subscriber,\n\nHere is your requested daily sync update containing the latest active job postings from ClientFlow.\n\nBest regards,\nThe ClientFlow Team`,
+                attachments: [
+                    {
+                        filename: 'job_leads.csv',
+                        path: CSV_PATH
+                    }
+                ]
+            };
+
+            await transporter.sendMail(mailOptions);
+            console.log("Daily CSV emails dispatched successfully via SMTP!");
+            return res.json({ success: true, message: `Dispatched to ${subscribers.length} emails.` });
+        } catch (err) {
+            console.error("Failed to send SMTP emails:", err);
+            return res.status(500).json({ success: false, error: err.message });
+        }
+    }
+
+    // Mock Email Send fallback
+    console.log("================ MOCK EMAIL SEND ================");
+    console.log(`From: "ClientFlow Updates" <updates@clientflow.com>`);
+    console.log(`To: ${subscribers.join(', ')}`);
+    console.log(`Subject: Daily Job Leads CSV Update - ClientFlow`);
+    console.log(`Attachment: Attached job_leads.csv (${fs.statSync(CSV_PATH).size} bytes)`);
+    console.log("=================================================");
+    
+    return res.json({ 
+        success: true, 
+        message: `Mock email triggered successfully to ${subscribers.length} subscribers (SMTP not configured).` 
     });
 });
 
